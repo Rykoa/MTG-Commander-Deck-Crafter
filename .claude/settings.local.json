@@ -3,7 +3,8 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(python -m pip install -r \"E:/AI Projects/MTG Commander Deck Crafter/requirements.txt\")",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(gh repo:*)"
     ]
   }
 }
