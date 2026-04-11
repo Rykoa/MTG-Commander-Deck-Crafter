@@ -9,25 +9,26 @@
 
 ---
 
-## Phase 2 — Intelligence [NEXT]
+## Phase 2 — Intelligence [COMPLETE]
 
 ### EDHREC Integration
-- [ ] Scrape/parse EDHREC commander pages for top cards, synergies, and average decklists
-- [ ] Card popularity data by commander
-- [ ] Archetype-specific staple recommendations
+- [x] Commander page JSON endpoint integration
+- [x] Card popularity data by commander (inclusion %, synergy score)
+- [x] Archetype-specific staple recommendations (theme pages)
+- [x] Available themes/tribes per commander
 
 ### Commander Spellbook Integration
-- [ ] Combo detection API integration
-- [ ] Auto-detect combos in any decklist
-- [ ] Suggest missing combo pieces for a deck
-- [ ] Flag infinite loops and win conditions
+- [x] Combo detection API integration (`/variants/` endpoint)
+- [x] Auto-detect combos in any decklist (`find_deck_combos`)
+- [x] Suggest missing combo pieces for a deck (`suggest_combo_pieces`)
+- [x] Find combos for a specific card or commander
 
 ### Deck Analyzer
-- [ ] Mana curve visualization
-- [ ] Mana base calculator (land count, color ratios, fixing requirements)
-- [ ] Category ratio checker (ramp, draw, removal, interaction, threats, win cons)
-- [ ] Average CMC scoring
-- [ ] Synergy scoring between cards
+- [x] Mana curve visualization (CMC distribution by bucket)
+- [x] Land count and color pip distribution
+- [x] Category ratio checker (ramp, draw, removal, wipes, tutors, counterspells)
+- [x] Average CMC scoring with assessment
+- [x] Actionable recommendations vs. Commander targets
 
 ---
 

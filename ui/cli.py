@@ -51,12 +51,24 @@ def on_tool_use(tool_name: str, tool_input: dict):
         input_summary = f"[dim]{tool_input['card_name']}[/dim]"
 
     tool_display = {
+        # Scryfall
         "get_card": "🔍 Looking up card",
         "search_cards": "🔎 Searching cards",
         "get_cards_for_commander": "🃏 Finding cards for commander",
         "get_card_rulings": "📜 Fetching rulings",
         "get_card_prices": "💰 Checking prices",
         "check_commander_legality": "✅ Checking legality",
+        # Deck Analyzer
+        "analyze_deck": "📊 Analyzing deck",
+        # Commander Spellbook
+        "find_combos_for_card": "♾️  Finding combos for card",
+        "find_combos_for_commander": "♾️  Finding commander combos",
+        "find_deck_combos": "♾️  Scanning deck for combos",
+        "suggest_combo_pieces": "♾️  Suggesting combo completions",
+        # EDHREC
+        "get_commander_recommendations": "📈 Fetching EDHREC recommendations",
+        "get_commander_themes": "🎯 Fetching commander themes",
+        "get_theme_recommendations": "🎯 Fetching theme recommendations",
     }
     label = tool_display.get(tool_name, f"🔧 {tool_name}")
     console.print(f"  {label}: {input_summary}", style="dim cyan")

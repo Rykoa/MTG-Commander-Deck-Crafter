@@ -7,7 +7,10 @@ import os
 import json
 import anthropic
 from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, KNOWLEDGE_DIR
-from agent.tools.scryfall import SCRYFALL_TOOL_DEFINITIONS, dispatch_tool
+from agent.tools.scryfall import SCRYFALL_TOOL_DEFINITIONS, dispatch_tool as scryfall_dispatch
+from agent.tools.deck_analyzer import DECK_ANALYZER_TOOL_DEFINITIONS, dispatch_tool as analyzer_dispatch
+from agent.tools.spellbook import SPELLBOOK_TOOL_DEFINITIONS, dispatch_tool as spellbook_dispatch
+from agent.tools.edhrec import EDHREC_TOOL_DEFINITIONS, dispatch_tool as edhrec_dispatch
 
 
 def load_system_prompt() -> str:
@@ -21,7 +24,28 @@ class DeckCrafterAgent:
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         self.system_prompt = load_system_prompt()
         self.conversation_history = []
-        self.tools = SCRYFALL_TOOL_DEFINITIONS
+        self.tools = (
+            SCRYFALL_TOOL_DEFINITIONS
+            + DECK_ANALYZER_TOOL_DEFINITIONS
+            + SPELLBOOK_TOOL_DEFINITIONS
+            + EDHREC_TOOL_DEFINITIONS
+        )
+        self._dispatchers = [
+            scryfall_dispatch,
+            analyzer_dispatch,
+            spellbook_dispatch,
+            edhrec_dispatch,
+        ]
+
+    def _dispatch(self, tool_name: str, tool_input: dict) -> str:
+        """Route a tool call to the correct dispatcher."""
+        import json
+        for dispatcher in self._dispatchers:
+            result = dispatcher(tool_name, tool_input)
+            parsed = json.loads(result)
+            if not (isinstance(parsed, dict) and parsed.get("error", "").startswith("Unknown tool:")):
+                return result
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
     def reset(self):
         """Clear conversation history to start a new session."""
@@ -96,7 +120,7 @@ class DeckCrafterAgent:
                         if on_tool_use:
                             on_tool_use(tool_name, tool_input)
 
-                        result = dispatch_tool(tool_name, tool_input)
+                        result = self._dispatch(tool_name, tool_input)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
