@@ -84,8 +84,8 @@
 | Priority | Integration | Purpose | Status |
 |---|---|---|---|
 | 1 | **Scryfall API** | Card data, search, prices, legality | DONE |
-| 2 | **Commander Spellbook API** | Combo database | Phase 2 |
-| 3 | **EDHREC** | Popularity data, commander recommendations | Phase 2 |
+| 2 | **Commander Spellbook API** | Combo database | DONE |
+| 3 | **EDHREC** | Popularity data, commander recommendations | DONE |
 | 4 | **MTGJson** | Bulk offline card data | Phase 2 |
 | 5 | **Moxfield** | Import/export, popular decklists | Phase 3 |
 | 6 | **TCGPlayer API** | Detailed pricing | Phase 3 |
