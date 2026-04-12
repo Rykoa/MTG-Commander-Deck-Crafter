@@ -36,6 +36,74 @@ def _get(endpoint: str, params: dict = None) -> dict:
     return response.json()
 
 
+def _post(endpoint: str, payload: dict) -> dict:
+    """Rate-limited POST request to Scryfall."""
+    global _last_request_time
+    elapsed = time.time() - _last_request_time
+    if elapsed < SCRYFALL_RATE_LIMIT_DELAY:
+        time.sleep(SCRYFALL_RATE_LIMIT_DELAY - elapsed)
+
+    url = f"{SCRYFALL_BASE_URL}{endpoint}"
+    response = requests.post(url, json=payload, timeout=30)
+    _last_request_time = time.time()
+
+    if response.status_code == 404:
+        return {"error": "not_found", "message": "Resource not found."}
+    if response.status_code == 400:
+        data = response.json()
+        return {"error": "bad_request", "message": data.get("details", "Bad request.")}
+    response.raise_for_status()
+    return response.json()
+
+
+def get_cards_batch(names: list[str]) -> dict[str, dict]:
+    """
+    Fetch up to 75 cards per request using Scryfall's /cards/collection endpoint.
+    Returns a dict mapping lowercased name → formatted card dict.
+    Cards already in the local cache are returned without a network call.
+    Not-found cards are returned as {"error": "not_found"}.
+    """
+    result: dict[str, dict] = {}
+    to_fetch: list[str] = []
+
+    for name in names:
+        cache_path = _cache_key("card", name.lower())
+        cached = _read_cache(cache_path)
+        if cached:
+            result[name.lower()] = cached
+        else:
+            to_fetch.append(name)
+
+    # Scryfall /cards/collection accepts max 75 identifiers per request
+    BATCH_SIZE = 75
+    for i in range(0, len(to_fetch), BATCH_SIZE):
+        batch = to_fetch[i:i + BATCH_SIZE]
+        payload = {"identifiers": [{"name": n} for n in batch]}
+        data = _post("/cards/collection", payload)
+
+        if "error" in data:
+            for name in batch:
+                result[name.lower()] = {"error": "not_found", "name": name}
+            continue
+
+        # Map returned cards back by name (lowercased for matching)
+        found_names = set()
+        for card in data.get("data", []):
+            formatted = _format_card(card)
+            key = formatted["name"].lower()
+            result[key] = formatted
+            found_names.add(key)
+            cache_path = _cache_key("card", key)
+            _write_cache(cache_path, formatted)
+
+        # Mark anything not returned as not found
+        for name in batch:
+            if name.lower() not in result:
+                result[name.lower()] = {"error": "not_found", "name": name}
+
+    return result
+
+
 def _cache_key(prefix: str, value: str) -> str:
     return os.path.join(CACHE_DIR, f"{prefix}_{hashlib.md5(value.encode()).hexdigest()}.json")
 

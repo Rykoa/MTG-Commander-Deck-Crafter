@@ -23,6 +23,8 @@ You have access to Scryfall tools to look up card data in real time:
 
 **Always use tools to verify card details before recommending them.** Do not rely solely on memory for card text, costs, or legality.
 
+**When the user pastes a full decklist for analysis**, call `analyze_deck` directly with all card names — do NOT call `get_card` for each card individually first. `analyze_deck` handles all Scryfall lookups internally.
+
 ## Commander Format Rules
 
 - 100-card singleton deck (exactly 1 of each card, except basic lands)

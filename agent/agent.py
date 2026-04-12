@@ -51,7 +51,37 @@ class DeckCrafterAgent:
         """Clear conversation history to start a new session."""
         self.conversation_history = []
 
-    def chat(self, user_message: str, on_text: callable = None, on_tool_use: callable = None) -> str:
+    # Condensed system prompt for pre-computed deck analysis.
+    # Keeps the Commander-specific framework (ratios, power levels, archetypes)
+    # but omits tool instructions and verbose sections to save tokens.
+    ANALYSIS_SYSTEM_PROMPT = """You are an expert MTG Commander deck builder. \
+The user's deck has been pre-analyzed locally — interpret the stats and give specific, actionable recommendations.
+
+## Commander Deck Targets (100-card deck)
+- Ramp: 10 minimum, 12 ideal
+- Card draw: 10 minimum, 12 ideal
+- Removal: 8 minimum, 10 ideal
+- Board wipes: 3 minimum, 4-5 ideal
+- Lands: 35 minimum, 37 ideal
+- Average CMC (non-land): under 3.2 is efficient, 3.2-3.8 is midrange, above 3.8 needs extra ramp
+
+## Power Level (1-10)
+- 1-3: Precon/casual, no tutors
+- 4-6: Upgraded, some synergy, occasional tutor
+- 7-8: Optimized, multiple win cons, tutors, efficient interaction
+- 9-10: cEDH — fast mana, 2-card combos, heavy tutor package
+
+## Response format
+Lead with the most critical issues, then strengths, then specific card suggestions to fix weaknesses. \
+Be direct and name exact cards."""
+
+    def chat(
+        self,
+        user_message: str,
+        on_text: callable = None,
+        on_tool_use: callable = None,
+        precomputed: bool = False,
+    ) -> str:
         """
         Send a message and get a response.
 
@@ -59,6 +89,8 @@ class DeckCrafterAgent:
             user_message: The user's input
             on_text: Optional callback(text_chunk) called for each streamed text delta
             on_tool_use: Optional callback(tool_name, tool_input) called when a tool is invoked
+            precomputed: If True, skips tool definitions and uses a minimal system prompt.
+                         Use this when deck analysis has already been computed locally.
 
         Returns:
             The complete assistant response text
@@ -70,16 +102,21 @@ class DeckCrafterAgent:
 
         full_response_text = ""
 
+        # When analysis is pre-computed we send no tools and a short system prompt,
+        # saving ~2000 tokens of tool definitions and ~1500 tokens of system prompt
+        # per request.
+        stream_kwargs = dict(
+            model=ANTHROPIC_MODEL,
+            max_tokens=2048 if precomputed else 8192,
+            system=self.ANALYSIS_SYSTEM_PROMPT if precomputed else self.system_prompt,
+            messages=self.conversation_history,
+        )
+        if not precomputed:
+            stream_kwargs["tools"] = self.tools
+
         while True:
             # Stream the response
-            with self.client.messages.stream(
-                model=ANTHROPIC_MODEL,
-                max_tokens=8192,
-                system=self.system_prompt,
-                tools=self.tools,
-                messages=self.conversation_history,
-                thinking={"type": "adaptive"},
-            ) as stream:
+            with self.client.messages.stream(**stream_kwargs) as stream:
                 # Collect streamed text for display
                 current_text = ""
                 for event in stream:
@@ -132,6 +169,8 @@ class DeckCrafterAgent:
                     "role": "user",
                     "content": tool_results
                 })
+                # Update messages in stream_kwargs for next iteration
+                stream_kwargs["messages"] = self.conversation_history
                 continue
 
             # Any other stop reason — extract text and break

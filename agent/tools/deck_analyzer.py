@@ -7,7 +7,7 @@ Cards are looked up via Scryfall to get CMC, type line, and oracle text.
 """
 
 import re
-from agent.tools.scryfall import get_card
+from agent.tools.scryfall import get_cards_batch
 
 
 # ─── Category detection ───────────────────────────────────────────────────────
@@ -133,6 +133,39 @@ def analyze_deck(card_names: list[str]) -> dict:
     if not card_names:
         return {"error": "No cards provided."}
 
+    def _clean_name(raw: str) -> str | None:
+        """
+        Parse a single line from an Archidekt (or similar) text export into a
+        plain card name, or return None if the line should be skipped.
+
+        Handles:
+          - Empty lines and comment lines (// or #)
+          - Section headers with no leading quantity: "Commander (1)", "Ramp (12)"
+          - Leading quantities: "1 Sol Ring", "1x Sol Ring"
+          - Trailing set code + collector number: "Sol Ring (M21) 268"
+          - Foil markers: "Sol Ring *F*", "Sol Ring (Foil)"
+        """
+        raw = raw.strip()
+        if not raw:
+            return None
+        # Skip comment lines
+        if raw.startswith("//") or raw.startswith("#"):
+            return None
+        # Skip section headers: no leading digit, ends with (N)
+        # e.g. "Commander (1)", "Ramp (12)", "Card Draw (8)"
+        if not re.match(r"^\d", raw) and re.search(r"\(\d+\)\s*$", raw):
+            return None
+        # Strip leading quantity: "1 " or "1x "
+        raw = re.sub(r"^\d+x?\s+", "", raw)
+        # Strip trailing set code + optional collector number: "(M21) 268" or "(M21)"
+        raw = re.sub(r"\s*\([A-Z0-9]{2,5}\)\s*\d*\s*$", "", raw)
+        # Strip foil markers
+        raw = re.sub(r"\s*\*[Ff]\*\s*$", "", raw)
+        raw = re.sub(r"\s*\(Foil\)\s*$", "", raw, flags=re.IGNORECASE)
+        return raw.strip() or None
+
+    cleaned_names = [c for n in card_names if (c := _clean_name(n)) is not None]
+
     curve = {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6+": 0}
     categories = {cat: [] for cat in CATEGORY_PATTERNS}
     land_names = []
@@ -141,8 +174,11 @@ def analyze_deck(card_names: list[str]) -> dict:
     non_land_count = 0
     not_found = []
 
-    for name in card_names:
-        card = get_card(name)
+    # Fetch all cards in bulk (2 requests for a 100-card deck instead of 100)
+    card_map = get_cards_batch(cleaned_names)
+
+    for name in cleaned_names:
+        card = card_map.get(name.lower(), {"error": "not_found", "name": name})
         if "error" in card:
             not_found.append(name)
             continue
@@ -222,14 +258,14 @@ def analyze_deck(card_names: list[str]) -> dict:
         "not_found": not_found,
         "lands": {
             "count": len(land_names),
-            "names": land_names,
+            "examples": land_names[:5],
         },
         "mana_curve": curve,
         "average_cmc": avg_cmc,
         "cmc_assessment": cmc_note,
         "color_distribution": color_distribution,
         "categories": {
-            cat: {"count": len(cards), "cards": cards}
+            cat: {"count": len(cards), "examples": cards[:5]}
             for cat, cards in categories.items()
         },
         "recommendations": recommendations,
@@ -247,7 +283,10 @@ DECK_ANALYZER_TOOL_DEFINITIONS = [
             "color pip distribution, and actionable recommendations. "
             "Use this when the user pastes a decklist, asks to evaluate their deck, "
             "or asks about their mana base, curve, or category balance. "
-            "Input is a list of card names (the full 99 + commander, or any subset)."
+            "Input is a list of card names (the full 99 + commander, or any subset). "
+            "IMPORTANT: This tool fetches all card data internally via Scryfall — do NOT "
+            "call get_card or any other tool for individual cards before calling this. "
+            "Pass the full card name list directly and let this tool handle all lookups."
         ),
         "input_schema": {
             "type": "object",
@@ -255,7 +294,12 @@ DECK_ANALYZER_TOOL_DEFINITIONS = [
                 "card_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of card names in the deck."
+                    "description": (
+                "List of card name entries from the deck. Accepts raw Archidekt export lines "
+                "directly — quantities ('1 Sol Ring'), set codes ('Sol Ring (M21) 268'), "
+                "foil markers ('*F*'), and section headers ('Ramp (12)') are all handled "
+                "internally. You do not need to pre-clean the lines."
+            )
                 }
             },
             "required": ["card_names"]
