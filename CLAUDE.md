@@ -5,7 +5,7 @@ AI-powered Magic: The Gathering Commander (EDH) deck building assistant. Uses Cl
 
 ## Tech Stack
 - **Language:** Python 3.14
-- **AI:** Claude API (Anthropic) with tool use + adaptive thinking
+- **AI:** Claude API (Anthropic) with tool use (no extended thinking)
 - **Card Data:** Scryfall API (free, no auth)
 - **UI:** Rich terminal CLI (Streamlit planned for Phase 3)
 
@@ -18,7 +18,7 @@ AI-powered Magic: The Gathering Commander (EDH) deck building assistant. Uses Cl
 - `agent/tools/edhrec.py` — EDHREC recommendations, themes, card popularity by commander
 - `agent/tools/spellbook.py` — Commander Spellbook combo detection and missing-piece suggestions
 - `knowledge/system_prompt.md` — Commander theory, ratios, archetypes, staples
-- `ui/cli.py` — Rich terminal chat interface with tool call indicators for all tools
+- `ui/cli.py` — Rich terminal chat interface; silent tool calls, two-phase spinner, /paste command
 - `data/cache/` — Auto-populated Scryfall response cache
 - `Makefile` — Common dev commands
 - `USER_GUIDE.md` — End-user documentation
@@ -35,7 +35,9 @@ AI-powered Magic: The Gathering Commander (EDH) deck building assistant. Uses Cl
 3. `python main.py`
 
 ## Key Decisions
-- Model: `claude-opus-4-6` (configurable in config.py)
+- Model: `claude-sonnet-4-6` (configurable in config.py) — switched from Opus for speed/cost
+- Extended thinking: disabled — saves significant token cost
+- Deck analysis: pre-computed locally via Scryfall batch API before any Claude call
+- Scryfall batch lookups: up to 75 cards per POST to /cards/collection (cached in data/cache/)
+- Analysis mode uses condensed system prompt (~250 tokens) and no tool definitions
 - Scryfall rate limit: 100ms delay between requests per their guidelines
-- Card responses cached locally in `data/cache/` as JSON
-- Agent uses streaming with adaptive thinking for best UX
